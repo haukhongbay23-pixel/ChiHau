@@ -1,0 +1,234 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- [BẢO MẬT] Mã hóa Key: ChiiHaudz
+local obfuscated_key = {67, 104, 105, 105, 72, 97, 117, 100, 122} 
+local function get_key(bytes)
+    local k = ""
+    for i = 1, #bytes do k = k .. string.char(bytes[i]) end
+    return k
+end
+
+local CorrectKey = get_key(obfuscated_key)
+local HasKey = false
+_G.AutoFarmChest = false
+_G.IsTeleporting = false
+_G.FarmSpeed = 120 
+
+local TweenService = game:GetService("TweenService")
+local CurrentTween = nil
+
+-- Hàm Reset Nhân Vật
+local function ResetCharacter()
+    local player = game.Players.LocalPlayer
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.Health = 0 -- Cách reset ổn định nhất
+        task.wait(4.5) -- Đợi hồi sinh hoàn toàn
+    end
+end
+
+-- Hàm Bay (Tween)
+local function TweenTo(targetCFrame)
+    local char = game.Players.LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if CurrentTween then CurrentTween:Cancel() end 
+        local distance = (root.Position - targetCFrame.Position).Magnitude
+        local duration = distance / _G.FarmSpeed
+        local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+        CurrentTween = TweenService:Create(root, info, {CFrame = targetCFrame})
+        CurrentTween:Play()
+        return CurrentTween
+    end
+end
+
+-- 1. NÚT TRÒN BẬT/TẮT MENU
+local function CreateToggleButton()
+    if game:GetService("CoreGui"):FindFirstChild("ChiiHauuToggle") then
+        game:GetService("CoreGui").ChiiHauuToggle:Destroy()
+    end
+    local ScreenGui = Instance.new("ScreenGui")
+    local ImageButton = Instance.new("ImageButton")
+    local UICorner = Instance.new("UICorner")
+    ScreenGui.Name = "ChiiHauuToggle"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.IgnoreGuiInset = true 
+    ImageButton.Parent = ScreenGui
+    ImageButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    ImageButton.BackgroundTransparency = 0.3
+    ImageButton.Position = UDim2.new(0.1, 0, 0.15, 0)
+    ImageButton.Size = UDim2.new(0, 60, 0, 60)
+    ImageButton.Image = "rbxassetid://88038667117291" 
+    ImageButton.Draggable = true 
+    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.Parent = ImageButton
+    ImageButton.MouseButton1Click:Connect(function()
+        pcall(function()
+            local coreGui = game:GetService("CoreGui")
+            local rf = coreGui:FindFirstChild("Rayfield") or coreGui:FindFirstChild("RayfieldUI")
+            if rf then
+                local main = rf:FindFirstChild("Main")
+                if main then main.Visible = not main.Visible end
+            end
+        end)
+    end)
+end
+CreateToggleButton()
+
+-- 2. Kiểm tra Sea
+local function GetCurrentSea()
+    local placeId = game.PlaceId
+    if placeId == 2753915549 then return "Sea 1"
+    elseif placeId == 4442245419 then return "Sea 2"
+    elseif placeId == 7449925069 then return "Sea 3"
+    else return "Unknown" end
+end
+local CurrentSea = GetCurrentSea()
+
+local Window = Rayfield:CreateWindow({
+   Name = "🏴‍☠️ Blox Fruits: Chii Hauu HUB",
+   LoadingTitle = "Hệ Thống Reset & Farm Rương",
+   LoadingSubtitle = "by Chii Hauu | " .. CurrentSea,
+   KeySystem = false, 
+   Keybind = "LeftControl"
+})
+
+-- 3. Logic Farm Rương
+function doFarmChest()
+    task.spawn(function()
+        while _G.AutoFarmChest do
+            task.wait(0.1)
+            local player = game.Players.LocalPlayer
+            local char = player.Character or player.CharacterAdded:Wait()
+            local root = char:WaitForChild("HumanoidRootPart", 5)
+            
+            if root then
+                local targetChest = nil
+                local minDist = math.huge
+                
+                for _, v in pairs(game.Workspace:GetDescendants()) do
+                    if v:IsA("BasePart") and v.Name:find("Chest") then
+                        local dist = (v.Position - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetChest = v
+                        end
+                    end
+                end
+
+                if targetChest then
+                    local distanceToChest = (targetChest.Position - root.Position).Magnitude
+                    
+                    if distanceToChest > 3000 then
+                        Rayfield:Notify({Title = "Chuyển Đảo", Content = "Rương quá xa, đang Reset...", Duration = 3})
+                        ResetCharacter()
+                        continue -- Bỏ qua lượt này để lấy Character mới ở vòng lặp sau
+                    end
+                    
+                    _G.IsTeleporting = true
+                    TweenTo(targetChest.CFrame * CFrame.new(0, 2, 0))
+                    
+                    local timeout = 0
+                    repeat 
+                        task.wait(0.1)
+                        timeout = timeout + 1
+                    until not targetChest.Parent or not _G.AutoFarmChest or timeout > 100
+                    
+                    if CurrentTween then CurrentTween:Cancel() end
+                    _G.IsTeleporting = false
+                else
+                    task.wait(2) 
+                end
+            end
+        end
+    end)
+end
+
+-- 4. Noclip
+game:GetService("RunService").Stepped:Connect(function()
+    local char = game.Players.LocalPlayer.Character
+    if char and (_G.AutoFarmChest or _G.IsTeleporting) then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+-- TABS
+local KeyTab = Window:CreateTab("🔑 Key")
+local MainTab = Window:CreateTab("💰 Farm Rương")
+local TeleportTab = Window:CreateTab("🏝️ Dịch Chuyển")
+
+KeyTab:CreateInput({
+   Name = "Nhập Key",
+   PlaceholderText = "Nhập key tại đây...",
+   Callback = function(Text)
+      if Text == CorrectKey then 
+         HasKey = true 
+         Rayfield:Notify({Title = "THÀNH CÔNG", Content = "Chào Chii Hauu!", Duration = 5})
+      else
+         Rayfield:Notify({Title = "SAI KEY", Content = "Vui lòng kiểm tra lại!", Duration = 5})
+      end
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Tốc độ nhặt",
+   Range = {50, 300},
+   Increment = 10,
+   Suffix = "Speed",
+   CurrentValue = 120,
+   Callback = function(Value) _G.FarmSpeed = Value end,
+})
+
+MainTab:CreateToggle({
+   Name = "Bật Auto Farm Chest",
+   CurrentValue = false,
+   Callback = function(Value)
+      if HasKey then
+         _G.AutoFarmChest = Value
+         if Value then doFarmChest() end
+      else
+         Rayfield:Notify({Title = "LỖI", Content = "Hãy nhập Key!", Duration = 5})
+      end
+   end,
+})
+
+-- Tọa độ Đảo
+local Islands = {
+    ["Sea 1"] = {["Đảo Khởi Đầu"] = CFrame.new(-483, 20, 4291), ["Đảo Khỉ"] = CFrame.new(-1246, 12, 4747)},
+    ["Sea 2"] = {["Quán Cafe"] = CFrame.new(-380, 77, 255)},
+    ["Sea 3"] = {["Mansion"] = CFrame.new(-12463, 374, -7551)}
+}
+
+local SeaData = Islands[CurrentSea]
+if SeaData then
+    for Name, CF in pairs(SeaData) do
+        TeleportTab:CreateButton({
+            Name = "Reset & Đến: " .. Name,
+            Callback = function()
+                if HasKey then 
+                    Rayfield:Notify({Title = "Thông Báo", Content = "Đang Reset nhân vật...", Duration = 3})
+                    ResetCharacter() 
+                    _G.IsTeleporting = true
+                    TweenTo(CF) 
+                    task.wait(2)
+                    _G.IsTeleporting = false
+                else
+                    Rayfield:Notify({Title = "LỖI", Content = "Chưa nhập Key!", Duration = 5})
+                end
+            end
+        })
+    end
+end
+
+MainTab:CreateButton({
+   Name = "🛑 Dừng Script",
+   Callback = function()
+      _G.AutoFarmChest = false
+      if CurrentTween then CurrentTween:Cancel() end
+      if game:GetService("CoreGui"):FindFirstChild("ChiiHauuToggle") then
+          game:GetService("CoreGui").ChiiHauuToggle:Destroy()
+      end
+      Rayfield:Destroy()
+   end,
+})
