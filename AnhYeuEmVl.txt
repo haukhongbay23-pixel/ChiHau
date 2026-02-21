@@ -1,0 +1,203 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- [BẢO MẬT] Mã hóa Key: CHII_HAUU_2026
+local obfuscated_key = {67, 72, 73, 73, 95, 72, 65, 85, 85, 95, 50, 48, 50, 54} 
+local function get_key(bytes)
+    local k = ""
+    for i = 1, #bytes do k = k .. string.char(bytes[i]) end
+    return k
+end
+
+local CorrectKey = get_key(obfuscated_key)
+local HasKey = false
+_G.AutoFarmChest = false
+_G.IsTeleporting = false
+_G.FarmSpeed = 120 
+
+local TweenService = game:GetService("TweenService")
+
+-- 1. Kiểm tra Sea hiện tại
+local function GetCurrentSea()
+    local placeId = game.PlaceId
+    if placeId == 2753915549 then return "Sea 1"
+    elseif placeId == 4442245419 then return "Sea 2"
+    elseif placeId == 7449925069 then return "Sea 3"
+    else return "Unknown" end
+end
+
+local CurrentSea = GetCurrentSea()
+
+-- Hàm Bay (Tween) đến mục tiêu
+local function TweenTo(targetCFrame)
+    local char = game.Players.LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local distance = (root.Position - targetCFrame.Position).Magnitude
+        local duration = distance / _G.FarmSpeed
+        local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+        local tween = TweenService:Create(root, info, {CFrame = targetCFrame})
+        tween:Play()
+        return tween
+    end
+end
+
+-- 2. NÚT TRÒN BẬT/TẮT MENU (Đã fix lỗi tạo lặp)
+local function CreateToggleButton()
+    if game:GetService("CoreGui"):FindFirstChild("ChiiHauuToggle") then
+        game:GetService("CoreGui").ChiiHauuToggle:Destroy()
+    end
+    
+    local ScreenGui = Instance.new("ScreenGui")
+    local ImageButton = Instance.new("ImageButton")
+    local UICorner = Instance.new("UICorner")
+    
+    ScreenGui.Name = "ChiiHauuToggle"
+    ScreenGui.Parent = game:GetService("CoreGui")
+    
+    ImageButton.Parent = ScreenGui
+    ImageButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    ImageButton.Position = UDim2.new(0.12, 0, 0.15, 0)
+    ImageButton.Size = UDim2.new(0, 50, 0, 50)
+    ImageButton.Image = "rbxassetid://88038667117291"
+    ImageButton.Draggable = true
+    
+    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.Parent = ImageButton
+    
+    ImageButton.MouseButton1Click:Connect(function()
+        local main = game:GetService("CoreGui"):FindFirstChild("Rayfield")
+        if main and main:FindFirstChild("Main") then
+            main.Main.Visible = not main.Main.Visible
+        end
+    end)
+end
+CreateToggleButton()
+
+local Window = Rayfield:CreateWindow({
+   Name = "🏴‍☠️ Blox Fruits: Chii Hauu HUB",
+   LoadingTitle = "Hệ Thống Farm Rương Tốc Độ Cao",
+   LoadingSubtitle = "by Chii Hauu | " .. CurrentSea,
+   KeySystem = false, 
+   Keybind = "LeftControl"
+})
+
+-- 3. Logic Farm Rương
+function doFarmChest()
+    task.spawn(function()
+        while _G.AutoFarmChest do
+            task.wait()
+            local char = game.Players.LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local targetChest = nil
+                local minDist = math.huge
+                for _, v in pairs(game.Workspace:GetDescendants()) do
+                    if v:IsA("BasePart") and v.Name:find("Chest") then
+                        local dist = (v.Position - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetChest = v
+                        end
+                    end
+                end
+
+                if targetChest then
+                    _G.IsTeleporting = true
+                    local tween = TweenTo(targetChest.CFrame * CFrame.new(0, 2, 0))
+                    repeat task.wait() until not targetChest.Parent or not _G.AutoFarmChest
+                    if tween then tween:Cancel() end
+                    _G.IsTeleporting = false
+                else
+                    task.wait(2)
+                end
+            end
+        end
+    end)
+end
+
+-- 4. Noclip
+game:GetService("RunService").Stepped:Connect(function()
+    local char = game.Players.LocalPlayer.Character
+    if char and (_G.AutoFarmChest or _G.IsTeleporting) then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+-- TABS
+local KeyTab = Window:CreateTab("🔑 Key")
+local MainTab = Window:CreateTab("💰 Farm Rương")
+local TeleportTab = Window:CreateTab("🏝️ Dịch Chuyển")
+
+KeyTab:CreateInput({
+   Name = "Nhập Key",
+   PlaceholderText = "Nhập key tại đây...",
+   Callback = function(Text)
+      if Text == CorrectKey then 
+         HasKey = true 
+         Rayfield:Notify({Title = "THÀNH CÔNG", Content = "Chào Chii Hauu!", Duration = 5})
+      else
+         Rayfield:Notify({Title = "SAI KEY", Content = "Vui lòng kiểm tra lại!", Duration = 5})
+      end
+   end,
+})
+
+MainTab:CreateSlider({
+   Name = "Tốc độ nhặt",
+   Range = {50, 300},
+   Increment = 10,
+   Suffix = "Speed",
+   CurrentValue = 120,
+   Callback = function(Value) _G.FarmSpeed = Value end,
+})
+
+MainTab:CreateToggle({
+   Name = "Bật Auto Farm Chest",
+   CurrentValue = false,
+   Callback = function(Value)
+      if HasKey then
+         _G.AutoFarmChest = Value
+         if Value then doFarmChest() end
+      else
+         Rayfield:Notify({Title = "LỖI", Content = "Hãy nhập Key!", Duration = 5})
+      end
+   end,
+})
+
+-- 5. Dịch chuyển Đảo (Đã fix lỗi thiếu code)
+local Islands = {
+    ["Sea 1"] = {["Đảo Khởi Đầu"] = CFrame.new(-483, 20, 4291), ["Đảo Khỉ"] = CFrame.new(-1246, 12, 4747)},
+    ["Sea 2"] = {["Quán Cafe"] = CFrame.new(-380, 77, 255)},
+    ["Sea 3"] = {["Mansion"] = CFrame.new(-12463, 374, -7551)}
+}
+
+local SeaData = Islands[CurrentSea]
+if SeaData then
+    for Name, CF in pairs(SeaData) do
+        TeleportTab:CreateButton({
+            Name = "Đến: " .. Name,
+            Callback = function()
+                if HasKey then 
+                    _G.IsTeleporting = true
+                    TweenTo(CF)
+                    task.wait(2)
+                    _G.IsTeleporting = false
+                else
+                    Rayfield:Notify({Title = "LỖI", Content = "Chưa nhập Key!", Duration = 5})
+                end
+            end
+        })
+    end
+end
+
+MainTab:CreateButton({
+   Name = "🛑 Dừng Script",
+   Callback = function()
+      _G.AutoFarmChest = false
+      if game:GetService("CoreGui"):FindFirstChild("ChiiHauuToggle") then
+          game:GetService("CoreGui").ChiiHauuToggle:Destroy()
+      end
+      Rayfield:Destroy()
+   end,
+})
